@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // change to "postgresql" in production
+  url      = env("DATABASE_URL")
+}
+
+model Guild {
+  id             String        @id
+  name           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  settings       GuildSettings?
+  logChannels    LogChannel[]
+  incidents      Incident[]
+  baselines      BaselineMetric[]
+  userProfiles   UserProfile[]
+  socialEdges    SocialEdge[]
+  auditLogs      AuditLog[]
+  forensicRecords ForensicRecord[] // ✅ Added reverse relation
+}
+
+model GuildSettings {
+  id                   Int       @id @default(autoincrement())
+  guildId              String    @unique
+  silentMode           Boolean   @default(true)
+  learningEnabled      Boolean   @default(true)
+  riskThreshold        Float     @default(0.75)
+  retentionDays        Int       @default(30)
+  moderationPolicy     String?   // strict, balanced, lenient
+  updatedAt            DateTime  @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model LogChannel {
+  id         Int       @id @default(autoincrement())
+  guildId    String
+  category   String
+  channelId  String
+  enabled    Boolean    @default(true)
+  verbosity  Int        @default(1)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, category])
+}
+
+model BaselineMetric {
+  id           Int       @id @default(autoincrement())
+  guildId      String
+  metricType   String
+  baseline     Float     @default(0)
+  stdDev       Float     @default(0)
+  sampleSize   Int       @default(0)
+  lastUpdated  DateTime  @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, metricType])
+}
+
+model UserProfile {
+  id                String     @id
+  guildId           String
+  username          String
+  discriminator     String?
+  trustScore        Float      @default(1.0)
+  riskScore         Float      @default(0.0)
+  lastActive        DateTime   @default(now())
+  joinDate          DateTime   @default(now())
+  behaviorSignature String?
+  status            String?
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, username])
+}
+
+model SocialEdge {
+  id          Int       @id @default(autoincrement())
+  guildId     String
+  sourceId    String
+  targetId    String
+  weight      Float      @default(0.0)
+  interaction String?
+  lastActive  DateTime   @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model Incident {
+  id          Int       @id @default(autoincrement())
+  guildId     String
+  incidentId  String     @unique
+  type        String
+  severity    Float      @default(0.5)
+  description String?
+  riskFactors String?    // ✅ was Json
+  actionTaken String?
+  resolved    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id           Int       @id @default(autoincrement())
+  guildId      String
+  incidentId   Int?
+  moderatorId  String?
+  action       String
+  reason       String?
+  context      String?   // ✅ was Json
+  hash         String?
+  createdAt    DateTime   @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model ForensicRecord {
+  id          Int       @id @default(autoincrement())
+  guildId     String
+  incidentId  Int?
+  data        String?    // ✅ was Json
+  hash        String?
+  createdAt   DateTime   @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
